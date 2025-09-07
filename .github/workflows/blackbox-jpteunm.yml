@@ -1,0 +1,78 @@
+name: Black-Box Quality Gate - jpteunm.com
+
+on:
+  schedule:
+    - cron: '0 8 * * 1' # Jalankan setiap Senin jam 08.00 (untuk monitoring berkala)
+  workflow_dispatch: # Memungkinkan menjalankan secara manual
+
+jobs:
+  quality-assessment:
+    runs-on: ubuntu-latest
+    env:
+      TARGET_URL: 'https://jpteunm.com' # 🎯 URL Target yang ditetapkan
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Install test dependencies
+      run: |
+        pip install -r tests/requirements.txt
+        npm install -g @axe-core/cli lighthouse puppeteer
+
+    # 1. TEST PERFORMANCE (ISO 25010: Performance Efficiency)
+    - name: Run Lighthouse Performance Test
+      run: |
+        lighthouse $TARGET_URL --output=json --output-path=./tests/results/lighthouse-report.json --chrome-flags="--headless --no-sandbox"
+
+    # 2. TEST SECURITY (ISO 25010: Security)
+    - name: Run OWASP ZAP Security Scan
+      run: |
+        docker run -v $(pwd)/tests/results:/zap/wrk/:rw -t owasp/zap2docker-stable zap-baseline.py -t $TARGET_URL -J zap-report.json || true # Ignore exit code untuk analisis nanti
+
+    # 3. TEST ACCESSIBILITY (ISO 25010: Usability)
+    - name: Run Accessibility Test
+      run: |
+        axe $TARGET_URL --save ./tests/results/accessibility-report.json
+
+    # 4. TEST FUNCTIONALITY (ISO 25010: Functional Suitability)
+    - name: Run Basic Functionality Checks
+      run: |
+        python tests/blackbox/ui-tests/basic_smoke_test.py
+
+    # 5. ANALISIS HASIL & QUALITY GATE
+    - name: Analyze results and enforce quality gate
+      id: quality-gate
+      run: |
+        python tests/scripts/quality-gate.py
+
+    # 6. UPLOAD HASIL TES SEBAGAI ARTIFAK (Untuk Inspeksi)
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always() # Upload bahkan jika gagal
+      with:
+        name: quality-reports
+        path: tests/results/
+
+    # 7. GAGALKAN JIKA QUALITY GATE TIDAK LULUS
+    - name: Fail if quality gate not passed
+      if: steps.quality-gate.outputs.result != 'PASS'
+      run: |
+        echo "❌ Quality Gate Failed. Overall Score: ${{ steps.quality-gate.outputs.score }}/100"
+        echo "Detail: ${{ steps.quality-gate.outputs.message }}"
+        exit 1
+
+    # 8. KIRIM NOTIFIKASI JIKA SUKSES (Opsional)
+    - name: Send success notification
+      if: success()
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        channel: '#monitoring'
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
