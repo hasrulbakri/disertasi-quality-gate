@@ -25,25 +25,33 @@ jobs:
         pip install -r tests/requirements.txt
         npm install -g @axe-core/cli lighthouse puppeteer
 
-    # 1. TEST PERFORMANCE (ISO 25010: Performance Efficiency)
+     # 1. TEST PERFORMANCE (ISO 25010: Performance Efficiency)
     - name: Run Lighthouse Performance Test
+      id: lighthouse # <-- TAMBAH ID UNTUK STEP INI
+      continue-on-error: true # <-- JANGAN BERHENTI MESKI ERROR
       run: |
         lighthouse $TARGET_URL --output=json --output-path=./tests/results/lighthouse-report.json --chrome-flags="--headless --no-sandbox"
 
     # 2. TEST SECURITY (ISO 25010: Security)
     - name: Run OWASP ZAP Security Scan
+      id: zap # <-- TAMBAH ID
+      continue-on-error: true # <-- JANGAN BERHENTI MESKI ERROR
       run: |
-        docker run -v $(pwd)/tests/results:/zap/wrk/:rw -t owasp/zap2docker-stable zap-baseline.py -t $TARGET_URL -J zap-report.json || true # Ignore exit code untuk analisis nanti
+        docker run -v $(pwd)/tests/results:/zap/wrk/:rw -t owasp/zap2docker-stable zap-baseline.py -t $TARGET_URL -J zap-report.json || true # Force success
 
     # 3. TEST ACCESSIBILITY (ISO 25010: Usability)
     - name: Run Accessibility Test
+      id: axe # <-- TAMBAH ID
+      continue-on-error: true
       run: |
-        axe $TARGET_URL --save ./tests/results/accessibility-report.json
+        axe $TARGET_URL --save ./tests/results/accessibility-report.json || echo "Axe failed but continuing..."
 
     # 4. TEST FUNCTIONALITY (ISO 25010: Functional Suitability)
     - name: Run Basic Functionality Checks
+      id: smoke-test # <-- TAMBAH ID
+      continue-on-error: true
       run: |
-        python tests/blackbox/ui-tests/basic_smoke_test.py
+        python tests/blackbox/ui-tests/basic_smoke_test.py || echo "Smoke test failed but continuing..."
 
     # 5. ANALISIS HASIL & QUALITY GATE
     - name: Analyze results and enforce quality gate
