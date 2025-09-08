@@ -57,11 +57,10 @@ jobs:
     - name: Analyze results and enforce quality gate
       id: quality-gate
       run: |
-         # Tambahkan perintah debugging ini
-    pwd && ls -la          # Lihat direktori kerja dan isinya
-    find . -name "*.json"  # Cari semua file JSON yang ada
-    echo "Menjalankan quality gate script..."
-    python tests/scripts/quality-gate.py
+         pwd && ls -la
+        find . -name "*.json"
+        echo "Menjalankan quality gate script..."
+        python tests/scripts/quality-gate.py
 
     # 6. UPLOAD HASIL TES SEBAGAI ARTIFAK (Untuk Inspeksi)
     - name: Upload test results
