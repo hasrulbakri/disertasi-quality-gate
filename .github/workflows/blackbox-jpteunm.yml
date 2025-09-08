@@ -57,7 +57,7 @@ jobs:
     - name: Analyze results and enforce quality gate
       id: quality-gate
       run: |
-         pwd && ls -la
+        pwd && ls -la
         find . -name "*.json"
         echo "Menjalankan quality gate script..."
         python tests/scripts/quality-gate.py
